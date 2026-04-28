@@ -567,28 +567,48 @@ select.form-input{cursor:pointer}
 
 <!-- MODAL: LOTE -->
 <div class="modal-overlay" id="modalLote">
-  <div class="modal" style="max-width:700px">
+  <div class="modal" style="max-width:98vw;width:1200px">
     <div class="modal-head">
       <div class="modal-title">REGISTRO EN LOTE</div>
       <button class="btn-icon" onclick="cerrarModal('modalLote')"><span class="material-symbols-outlined">close</span></button>
     </div>
-    <div class="modal-body">
-      <div class="form-group" style="margin-bottom:12px">
-        <label class="form-label">Asesor que registra</label>
-        <select class="form-input" id="loteAsesor"></select>
+    <div class="modal-body" style="padding:14px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <div class="form-group" style="flex:0 0 auto;min-width:180px">
+          <label class="form-label">Asesor que registra</label>
+          <select class="form-input" id="loteAsesor"></select>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="agregarFilaLote()"><span class="material-symbols-outlined">add</span>Agregar fila</button>
+          <button class="btn btn-secondary btn-sm" onclick="duplicarUltimaFila()"><span class="material-symbols-outlined">content_copy</span>Duplicar última</button>
+        </div>
       </div>
-      <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px;line-height:1.6">
-        Pega aquí directamente desde tu Excel. Formato esperado por columna:<br>
-        <strong style="color:var(--yellow)">Fecha | Cliente | CN/R | Estaciones | Precio Est. | Pegatinas | Precio Peg. | Envío | Folio | Etiqueta | Notas</strong><br>
-        La fecha puede ser DD/MM/YYYY o YYYY-MM-DD. CN/R acepta CN o R. El precio se calcula automáticamente si está vacío.
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px" id="loteTable">
+          <thead>
+            <tr style="background:var(--bg-light)">
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">#</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Fecha</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Cliente / Proveedor</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">CN/R</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Estaciones</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Precio Est.</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Pegatinas</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Envío</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Folio</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Etiqueta</th>
+              <th style="padding:7px 8px;text-align:left;color:var(--text-sub);white-space:nowrap;border-bottom:1px solid var(--border)">Total est.</th>
+              <th style="padding:7px 8px;border-bottom:1px solid var(--border)"></th>
+            </tr>
+          </thead>
+          <tbody id="loteBody"></tbody>
+        </table>
       </div>
-      <textarea class="lote-area" id="lotePaste" placeholder="Pega aquí las filas copiadas del Excel (Tab entre columnas, Enter entre filas)..."></textarea>
-      <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="previsualizarLote()"><span class="material-symbols-outlined">preview</span>Previsualizar</button>
-      <div class="lote-preview" id="lotePreview"></div>
+      <div id="loteSummary" style="margin-top:10px;font-size:12px;color:var(--text-sub)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="cerrarModal('modalLote')">Cancelar</button>
-      <button class="btn btn-primary" id="btnGuardarLote" onclick="guardarLote()"><span class="material-symbols-outlined">save</span>Guardar todo</button>
+      <button class="btn btn-primary" id="btnGuardarLote" onclick="guardarLote()"><span class="material-symbols-outlined">save</span>Registrar <span id="loteCount">0</span> ventas</button>
     </div>
   </div>
 </div>
@@ -678,7 +698,7 @@ select.form-input{cursor:pointer}
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
-const API = 'https://script.google.com/macros/s/AKfycbxDRRTCJp-AUr-VZNeYCoVdSLvD1L_HGWiwSqeY_zZdjvKCXEoV5bbE2pNo4u-2QZiKzg/exec';
+const API = 'https://script.google.com/macros/s/AKfycbwyAs9wt4yQrB0xjGVYhk-KFUx_l0XhOS-z3rImoZlSZSYb8_95zT4lIjt2hMefyPpHcg/exec';
 
 // Estado global
 var STATE = {
@@ -704,11 +724,12 @@ function apiGet(params) {
 }
 
 function apiPost(body) {
-  return fetch(API, {
-    method: 'POST',
-    body: JSON.stringify(body),
-    headers: {'Content-Type':'application/json'}
-  }).then(function(r){ return r.json(); });
+  // Google Apps Script bloquea POST desde dominios externos (CORS opaque).
+  // Solución: enviamos el payload como base64 via GET, que sí pasa CORS.
+  var json    = JSON.stringify(body);
+  var b64     = btoa(unescape(encodeURIComponent(json)));
+  var url     = API + '?payload=' + encodeURIComponent(b64);
+  return fetch(url).then(function(r){ return r.json(); });
 }
 
 // ============================================================
@@ -1591,81 +1612,170 @@ function guardarMovimiento() {
   });
 }
 
-// ── REGISTRO EN LOTE ───────────────────────────────
-function previsualizarLote() {
-  var texto = document.getElementById('lotePaste').value.trim();
-  if (!texto) { toast('Pega datos primero','error'); return; }
-  var lineas = texto.split('\n').filter(function(l){ return l.trim(); });
+// ── REGISTRO EN LOTE (tabla de filas) ─────────────
+function abrirModalLote() {
+  document.getElementById('loteAsesor').value = document.getElementById('asesorSelect').value;
   STATE.loteRows = [];
-  var preview = document.getElementById('lotePreview');
-  preview.innerHTML = '';
+  document.getElementById('loteBody').innerHTML = '';
+  document.getElementById('loteSummary').innerHTML = '';
+  document.getElementById('loteCount').textContent = '0';
+  agregarFilaLote();
+  abrirModal('modalLote');
+}
 
-  lineas.forEach(function(l, i) {
-    var cols = l.split('\t');
-    var fecha = cols[0]||hoy();
-    // Normalizar fecha DD/MM/YYYY -> YYYY-MM-DD
-    if (fecha.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-      var p = fecha.split('/');
-      fecha = p[2]+'-'+p[1]+'-'+p[0];
-    }
-    var cliente = cols[1]||'';
-    var cnr = (cols[2]||'R').toUpperCase().trim();
-    if (cnr !== 'CN') cnr = 'R';
-    var estaciones = parseInt(cols[3])||0;
-    var precioEst = parseFloat(cols[4]) || (estaciones >= 900 ? (parseFloat(STATE.config.PRECIO_EST_MAYOR)||32) : (parseFloat(STATE.config.PRECIO_EST_NORMAL)||38));
-    var pegatinas = parseInt(cols[5])||0;
-    var precioPeg = parseFloat(cols[6])||0;
-    var envio = parseFloat(cols[7])||(parseFloat(STATE.config.ENVIO_DEFAULT)||4.40);
-    var folio = cols[8]||'';
-    var etiqueta = cols[9]||'';
-    var notas = cols[10]||'';
-
-    if (!cliente) {
-      preview.innerHTML += '<div class="lote-row-err">Fila '+(i+1)+': Sin nombre de cliente — omitida</div>';
-      return;
-    }
-
-    STATE.loteRows.push({action:'registrarVenta', asesor:'', fecha:fecha, tipo_cliente:cnr,
-      cliente:cliente, estaciones:estaciones, precio_unit_est:precioEst,
-      pegatinas:pegatinas, precio_unit_peg:precioPeg, envio:envio,
-      folio_factura:folio, etiqueta:etiqueta, notas:notas});
-
-    var sub = estaciones * precioEst;
-    var iva = sub * 0.16;
-    var total = sub + iva + envio;
-    preview.innerHTML += '<div class="lote-row-ok">Fila '+(i+1)+': '+cliente+' | '+cnr+' | '+estaciones+' est. | Total: '+fmt(total)+(folio?' | Folio: '+folio:'')+'</div>';
+function buildEtiqOptions(selected) {
+  var opts = '<option value="">Sin etiqueta</option>';
+  STATE.etiquetas.forEach(function(e) {
+    opts += '<option value="'+e.NOMBRE+'"'+(e.NOMBRE===selected?' selected':'')+'>'+e.NOMBRE+'</option>';
   });
+  return opts;
+}
 
-  toast(STATE.loteRows.length+' filas válidas listas para guardar');
+function agregarFilaLote(data) {
+  var d = data || {};
+  var idx = document.getElementById('loteBody').rows.length;
+  var precio = d.precio || STATE.config.PRECIO_EST_NORMAL || 38;
+  var envio  = d.envio  || STATE.config.ENVIO_DEFAULT     || 4.40;
+  var fecha  = d.fecha  || hoy();
+  var tr = document.createElement('tr');
+  tr.style.borderBottom = '1px solid var(--border)';
+  tr.innerHTML =
+    '<td style="padding:4px 6px;color:var(--text-sub);font-size:11px">'+(idx+1)+'</td>'
+    +'<td style="padding:3px 4px"><input type="date" class="form-input" style="min-width:130px;font-size:12px;padding:5px 7px" value="'+fecha+'"/></td>'
+    +'<td style="padding:3px 4px"><input type="text" class="form-input" style="min-width:160px;font-size:12px;padding:5px 7px" placeholder="Nombre del cliente..." value="'+(d.cliente||'')+'"/></td>'
+    +'<td style="padding:3px 4px"><select class="form-input" style="font-size:12px;padding:5px 7px"><option value="R"'+(d.cnr!=='CN'?' selected':'')+'>R</option><option value="CN"'+(d.cnr==='CN'?' selected':'')+'>CN</option></select></td>'
+    +'<td style="padding:3px 4px"><input type="number" class="form-input lote-est" style="width:80px;font-size:12px;padding:5px 7px" value="'+(d.est||0)+'" min="0" oninput="calcFilaLote(this)"/></td>'
+    +'<td style="padding:3px 4px"><input type="number" class="form-input lote-precio" style="width:80px;font-size:12px;padding:5px 7px" value="'+precio+'" step="0.01" oninput="calcFilaLote(this)"/></td>'
+    +'<td style="padding:3px 4px"><input type="number" class="form-input" style="width:70px;font-size:12px;padding:5px 7px" value="'+(d.peg||0)+'" min="0"/></td>'
+    +'<td style="padding:3px 4px"><input type="number" class="form-input" style="width:70px;font-size:12px;padding:5px 7px" value="'+envio+'" step="0.01"/></td>'
+    +'<td style="padding:3px 4px"><input type="text" class="form-input" style="width:80px;font-size:12px;padding:5px 7px" placeholder="Folio" value="'+(d.folio||'')+'"/></td>'
+    +'<td style="padding:3px 4px"><select class="form-input" style="font-size:12px;padding:5px 7px;min-width:110px">'+buildEtiqOptions(d.etiqueta||'')+'</select></td>'
+    +'<td style="padding:3px 4px;color:var(--yellow);font-family:var(--font-mono);white-space:nowrap;font-size:12px" class="lote-total">$0.00</td>'
+    +'<td style="padding:3px 4px"><button class="btn-icon" onclick="eliminarFilaLote(this)" style="color:var(--red-light)"><span class="material-symbols-outlined" style="font-size:14px">delete</span></button></td>';
+  document.getElementById('loteBody').appendChild(tr);
+  calcFilaLote(tr.querySelector('.lote-est'));
+  actualizarContadorLote();
+}
+
+function calcFilaLote(input) {
+  var tr = input.closest('tr');
+  var est    = parseInt(tr.querySelector('.lote-est').value) || 0;
+  var precio = parseFloat(tr.querySelector('.lote-precio').value) || 38;
+  // Auto precio
+  if (est >= 900 && precio >= 38) {
+    tr.querySelector('.lote-precio').value = STATE.config.PRECIO_EST_MAYOR || 32;
+    precio = parseFloat(STATE.config.PRECIO_EST_MAYOR) || 32;
+  } else if (est > 0 && est < 900 && precio <= 32) {
+    tr.querySelector('.lote-precio').value = STATE.config.PRECIO_EST_NORMAL || 38;
+    precio = parseFloat(STATE.config.PRECIO_EST_NORMAL) || 38;
+  }
+  var sub   = est * precio;
+  var iva   = sub * 0.16;
+  var envio = parseFloat(tr.querySelectorAll('input[type="number"]')[3].value) || 0;
+  var total = sub + iva + envio;
+  tr.querySelector('.lote-total').textContent = fmt(total);
+  actualizarContadorLote();
+}
+
+function eliminarFilaLote(btn) {
+  btn.closest('tr').remove();
+  // Re-numerar
+  document.querySelectorAll('#loteBody tr').forEach(function(tr, i) {
+    tr.cells[0].textContent = i+1;
+  });
+  actualizarContadorLote();
+}
+
+function duplicarUltimaFila() {
+  var rows = document.getElementById('loteBody').rows;
+  if (!rows.length) { agregarFilaLote(); return; }
+  var last = rows[rows.length-1];
+  var inputs = last.querySelectorAll('input,select');
+  agregarFilaLote({
+    fecha:    inputs[0].value,
+    cliente:  '',
+    cnr:      inputs[2].value,
+    est:      inputs[3].value,
+    precio:   inputs[4].value,
+    peg:      inputs[5].value,
+    envio:    inputs[6].value,
+    folio:    '',
+    etiqueta: inputs[8].value,
+  });
+}
+
+function actualizarContadorLote() {
+  var n = document.getElementById('loteBody').rows.length;
+  document.getElementById('loteCount').textContent = n;
+  var totalEst = 0, totalImp = 0;
+  document.querySelectorAll('#loteBody tr').forEach(function(tr) {
+    totalEst += parseInt(tr.querySelector('.lote-est').value)||0;
+    var t = tr.querySelector('.lote-total').textContent.replace(/[$,]/g,'');
+    totalImp += parseFloat(t)||0;
+  });
+  document.getElementById('loteSummary').innerHTML =
+    'Total estaciones: <strong>'+totalEst+'</strong> &nbsp;|&nbsp; Total importe estimado: <strong style="color:var(--yellow)">'+fmt(totalImp)+'</strong>';
 }
 
 function guardarLote() {
-  if (!STATE.loteRows.length) { toast('Previsualiza primero los datos','error'); return; }
   var asesor = document.getElementById('loteAsesor').value;
   if (!asesor) { toast('Selecciona un asesor','error'); return; }
 
-  var btn = document.getElementById('btnGuardarLote');
-  btn.disabled = true;
-  btn.textContent = 'Guardando '+STATE.loteRows.length+' registros...';
+  var rows = document.getElementById('loteBody').rows;
+  if (!rows.length) { toast('Agrega al menos una fila','error'); return; }
 
-  var promesas = STATE.loteRows.map(function(row) {
-    row.asesor = asesor;
-    return apiPost(row);
+  var promesas = [];
+  var errores = [];
+
+  Array.from(rows).forEach(function(tr, i) {
+    var inputs  = tr.querySelectorAll('input,select');
+    var fecha   = inputs[0].value || hoy();
+    var cliente = inputs[1].value.trim();
+    var cnr     = inputs[2].value;
+    var est     = parseInt(inputs[3].value)||0;
+    var precio  = parseFloat(inputs[4].value)||38;
+    var peg     = parseInt(inputs[5].value)||0;
+    var envio   = parseFloat(inputs[6].value)||0;
+    var folio   = inputs[7].value;
+    var etiq    = inputs[8].value;
+
+    if (!cliente) { errores.push('Fila '+(i+1)+': sin cliente'); return; }
+
+    promesas.push(apiPost({
+      action:'registrarVenta', asesor:asesor,
+      fecha:fecha, tipo_cliente:cnr, cliente:cliente,
+      estaciones:est, precio_unit_est:precio,
+      pegatinas:peg, precio_unit_peg:0,
+      envio:envio, folio_factura:folio,
+      etiqueta:etiq, notas:'',
+    }));
   });
 
+  if (errores.length) { toast(errores.join(' | '),'error'); return; }
+  if (!promesas.length) { toast('Sin filas válidas','error'); return; }
+
+  var btn = document.getElementById('btnGuardarLote');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;display:inline-block"></span> Guardando...';
+
   Promise.all(promesas).then(function(results) {
-    var ok = results.filter(function(r){ return r.success; }).length;
+    var ok  = results.filter(function(r){ return r.success; }).length;
     var err = results.length - ok;
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlined">save</span>Guardar todo';
-    toast(ok+' registros guardados'+(err?' | '+err+' errores':''));
-    cerrarModal('modalLote');
-    STATE.loteRows = [];
-    var activePage = document.querySelector('.nav-item.active');
-    if (activePage && activePage.dataset.page === 'transacciones') cargarTransacciones();
-  }).catch(function(e) {
+    btn.innerHTML = '<span class="material-symbols-outlined">save</span>Registrar <span id="loteCount">0</span> ventas';
+    toast(ok+' ventas registradas'+(err?' | '+err+' con error':''));
+    if (ok > 0) {
+      cerrarModal('modalLote');
+      var activePage = document.querySelector('.nav-item.active');
+      if (activePage) {
+        var p = activePage.dataset.page;
+        if (p==='dashboard') cargarDashboard();
+        if (p==='transacciones') cargarTransacciones();
+      }
+    }
+  }).catch(function() {
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlined">save</span>Guardar todo';
+    btn.innerHTML = '<span class="material-symbols-outlined">save</span>Registrar <span id="loteCount">0</span> ventas';
     toast('Error de conexión','error');
   });
 }
