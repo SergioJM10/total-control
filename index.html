@@ -724,12 +724,20 @@ function apiGet(params) {
 }
 
 function apiPost(body) {
-  // Google Apps Script bloquea POST desde dominios externos (CORS opaque).
-  // Solución: enviamos el payload como base64 via GET, que sí pasa CORS.
-  var json    = JSON.stringify(body);
-  var b64     = btoa(unescape(encodeURIComponent(json)));
-  var url     = API + '?payload=' + encodeURIComponent(b64);
-  return fetch(url).then(function(r){ return r.json(); });
+  // Google Apps Script bloquea POST desde dominios externos (CORS).
+  // Enviamos el payload como base64 via GET, que sí pasa CORS.
+  // Usamos encodeURIComponent + unescape para manejar caracteres especiales (ñ, acentos).
+  try {
+    var json = JSON.stringify(body);
+    // Convertir a base64 seguro para caracteres UTF-8
+    var b64 = btoa(encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+      return String.fromCharCode('0x' + p1);
+    }));
+    var url = API + '?payload=' + encodeURIComponent(b64);
+    return fetch(url).then(function(r) { return r.json(); });
+  } catch(e) {
+    return Promise.reject(new Error('Error codificando payload: ' + e.message));
+  }
 }
 
 // ============================================================
